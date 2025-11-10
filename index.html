@@ -3,26 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gomoku Game</title>
+<title>Gomoku 五子棋</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
   <h1>Gomoku 五子棋</h1>
   <div id="message"></div>
-  <div id="mode-buttons">
-    <button id="pvp-btn">PvP</button>
-    <button id="pvc-btn">AI Mode</button>
-    <button id="theme-btn">Theme</button>
-    <button id="size-down-btn">Size -</button>
-    <button id="size-up-btn">Size +</button>
+  <div class="button-container">
+    <div id="mode-buttons">
+      <button id="pvp-btn">PvP</button>
+      <button id="pvc-btn">AI Mode</button>
+      <button id="theme-btn">Theme</button>
+      <button id="size-down-btn">Size -</button>
+      <button id="size-up-btn">Size +</button>
+    </div>
+    <div id="game-buttons">
+      <button id="restart-btn" class="hidden">Restart</button>
+      <button id="reverse-btn" class="hidden">Undo</button>
+      <button id="help-btn" class="hidden">Help Me</button>
+    </div>
   </div>
   <div id="board"></div>
   <canvas id="fireworks"></canvas>
   <div id="victory-message"></div>
-  <button id="restart-btn" class="hidden">Restart</button>
-  <button id="reverse-btn" class="hidden">Undo</button>
-  <button id="help-btn" class="hidden">Help Me</button>
   <footer class="credit">
     Created by Li Zheng (<a href="mailto:li_zheng@outlook.com">li_zheng@outlook.com</a>). Sure it's AI assisted.
   </footer>

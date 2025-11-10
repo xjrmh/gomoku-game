@@ -24,14 +24,14 @@ const victoryMessageEl = document.getElementById('victory-message');
 
 // Theme colors: [background, light cell, dark cell]
 const themes = [
-  ['#8B4513', '#DEB887', '#D2A679'], // Traditional wood
-  ['#2C5F2D', '#97BC62', '#85A956'], // Green
-  ['#1E3A8A', '#60A5FA', '#3B82F6'], // Blue
-  ['#7C2D12', '#FCA5A5', '#F87171'], // Red
-  ['#4C1D95', '#C4B5FD', '#A78BFA'], // Purple
-  ['#064E3B', '#6EE7B7', '#34D399'], // Teal
-  ['#78350F', '#FCD34D', '#FBBF24'], // Amber
-  ['#1F2937', '#9CA3AF', '#6B7280'], // Gray
+  ['#8B4513', '#DEB887', '#D2A679'], // Classic Wood (Walnut)
+  ['#D4A574', '#F5DEB3', '#E8C89F'], // Light Wood (Bamboo)
+  ['#5D4037', '#A1887F', '#8D6E63'], // Dark Wood (Cherry)
+  ['#2E7D32', '#81C784', '#66BB6A'], // Green Jade
+  ['#1565C0', '#64B5F6', '#42A5F5'], // Blue Marble
+  ['#424242', '#9E9E9E', '#757575'], // Slate Gray
+  ['#4A148C', '#BA68C8', '#AB47BC'], // Amethyst
+  ['#BF360C', '#FF8A65', '#FF7043'], // Terracotta
 ];
 
 let currentThemeIndex = 0;

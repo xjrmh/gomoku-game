@@ -26,10 +26,22 @@ h1 {
   min-height: 1.5em;
 }
 
+.button-container {
+  position: relative;
+  min-height: 50px;
+  margin-bottom: 10px;
+}
+
+#mode-buttons,
+#game-buttons {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 #mode-buttons button,
-#restart-btn,
-#reverse-btn,
-#help-btn {
+#game-buttons button {
   margin: 5px;
   padding: 10px 20px;
   font-size: 16px;
@@ -37,13 +49,11 @@ h1 {
   border: 2px solid #333;
   background-color: #fff;
   border-radius: 5px;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #mode-buttons button:hover,
-#restart-btn:hover,
-#reverse-btn:hover,
-#help-btn:hover {
+#game-buttons button:hover {
   background-color: #333;
   color: #fff;
 }
@@ -55,6 +65,11 @@ h1 {
   gap: 1px;
   grid-template-columns: repeat(15, 1fr);
   grid-template-rows: repeat(15, 1fr);
+  visibility: visible;
+}
+
+#board.hidden {
+  visibility: hidden;
 }
 
 .cell {
@@ -123,7 +138,7 @@ h1 {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 #fireworks {
