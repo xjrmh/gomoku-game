@@ -5,10 +5,13 @@ let currentPlayer = 'black';
 let gameActive = false;
 let vsComputer = false;
 let previousMode = false; // Track previous mode (false = PvP, true = vs Computer)
+let moveHistory = []; // Track move history for undo
 
 const boardContainer = document.getElementById('board');
 const messageEl = document.getElementById('message');
 const restartBtn = document.getElementById('restart-btn');
+const reverseBtn = document.getElementById('reverse-btn');
+const helpBtn = document.getElementById('help-btn');
 const pvpBtn = document.getElementById('pvp-btn');
 const pvcBtn = document.getElementById('pvc-btn');
 const themeBtn = document.getElementById('theme-btn');
@@ -60,6 +63,8 @@ restartBtn.addEventListener('click', () => {
     resetGame();
   }
 });
+reverseBtn.addEventListener('click', () => reverseMove());
+helpBtn.addEventListener('click', () => showHint());
 themeBtn.addEventListener('click', () => changeTheme());
 sizeUpBtn.addEventListener('click', () => changeBoardSize(1));
 sizeDownBtn.addEventListener('click', () => changeBoardSize(-1));
@@ -73,9 +78,12 @@ function startGame(computerMode) {
   document.getElementById('mode-buttons').classList.add('hidden');
   boardContainer.classList.remove('hidden');
   restartBtn.classList.remove('hidden');
+  reverseBtn.classList.remove('hidden');
+  helpBtn.classList.remove('hidden');
   resetBoard();
   gameActive = true;
   currentPlayer = 'black';
+  moveHistory = []; // Clear move history
   messageEl.textContent = vsComputer ? 'Your turn' : 'Black starts';
   
   // Update page title and h1 title
@@ -108,8 +116,11 @@ function resetGame() {
   document.getElementById('mode-buttons').classList.remove('hidden');
   boardContainer.classList.remove('hidden');
   restartBtn.classList.add('hidden');
+  reverseBtn.classList.add('hidden');
+  helpBtn.classList.add('hidden');
   messageEl.textContent = '';
   gameActive = false;
+  moveHistory = []; // Clear move history
   // Clear and render an empty board
   resetBoard();
   
@@ -159,11 +170,21 @@ function handleCellClick(event) {
 }
 
 function placeStone(row, col, player) {
+  // Remove any existing hint
+  const existingHint = document.querySelector('.hint-indicator');
+  if (existingHint) {
+    existingHint.remove();
+  }
+  
   board[row][col] = player;
   const cell = boardContainer.children[row * boardSize + col];
   const stone = document.createElement('div');
   stone.classList.add('stone', player);
   cell.appendChild(stone);
+  
+  // Add to move history
+  moveHistory.push({ row, col, player });
+  
   playClickSound();
 }
 
@@ -419,6 +440,74 @@ function changeBoardSize(delta) {
   setTimeout(() => {
     messageEl.textContent = '';
   }, 2000);
+}
+
+function reverseMove() {
+  if (!gameActive || moveHistory.length === 0) {
+    return;
+  }
+  
+  // In AI mode, undo both AI and player moves
+  const movesToUndo = vsComputer && currentPlayer === 'black' && moveHistory.length >= 2 ? 2 : 1;
+  
+  for (let i = 0; i < movesToUndo && moveHistory.length > 0; i++) {
+    const lastMove = moveHistory.pop();
+    
+    // Remove stone from board
+    board[lastMove.row][lastMove.col] = null;
+    
+    // Remove stone from UI
+    const cell = boardContainer.children[lastMove.row * boardSize + lastMove.col];
+    const stone = cell.querySelector('.stone');
+    if (stone) {
+      cell.removeChild(stone);
+    }
+    
+    // Update current player
+    currentPlayer = lastMove.player;
+  }
+  
+  // Update message
+  if (vsComputer) {
+    messageEl.textContent = 'Your turn';
+  } else {
+    messageEl.textContent = currentPlayer === 'black' ? "Black's turn" : "White's turn";
+  }
+}
+
+function showHint() {
+  if (!gameActive) return;
+  
+  // Remove any existing hint
+  const existingHint = document.querySelector('.hint-indicator');
+  if (existingHint) {
+    existingHint.remove();
+  }
+  
+  // Get best move using AI evaluation
+  const bestMove = findBestMove();
+  if (!bestMove) return;
+  
+  const [row, col] = bestMove;
+  const cell = boardContainer.children[row * boardSize + col];
+  
+  // Add hint indicator
+  const hint = document.createElement('div');
+  hint.classList.add('hint-indicator');
+  cell.appendChild(hint);
+  
+  // Remove hint after 3 seconds
+  setTimeout(() => {
+    hint.remove();
+  }, 3000);
+  
+  messageEl.textContent = 'Hint shown for 3 seconds';
+  setTimeout(() => {
+    if (gameActive) {
+      messageEl.textContent = vsComputer ? 'Your turn' : 
+        (currentPlayer === 'black' ? "Black's turn" : "White's turn");
+    }
+  }, 3000);
 }
 
 // Fireworks animation

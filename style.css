@@ -27,7 +27,9 @@ h1 {
 }
 
 #mode-buttons button,
-#restart-btn {
+#restart-btn,
+#reverse-btn,
+#help-btn {
   margin: 5px;
   padding: 10px 20px;
   font-size: 16px;
@@ -39,7 +41,9 @@ h1 {
 }
 
 #mode-buttons button:hover,
-#restart-btn:hover {
+#restart-btn:hover,
+#reverse-btn:hover,
+#help-btn:hover {
   background-color: #333;
   color: #fff;
 }
@@ -93,6 +97,31 @@ h1 {
   border: 1px solid #999;
 }
 
+.hint-indicator {
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 3px solid #ff0000;
+  background-color: rgba(255, 0, 0, 0.2);
+  animation: hintPulse 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes hintPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.7;
+  }
+}
+
 .hidden {
   display: none;
 }
@@ -140,6 +169,23 @@ h1 {
   50% {
     transform: translate(-50%, -50%) scale(1.1);
   }
+}
+
+.credit {
+  margin-top: 20px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.credit a {
+  color: #666;
+  text-decoration: none;
+}
+
+.credit a:hover {
+  color: #333;
+  text-decoration: underline;
 }
 
 /* Responsive layout: adapt board size for smaller screens */
