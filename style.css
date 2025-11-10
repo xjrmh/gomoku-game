@@ -13,28 +13,55 @@ body {
   padding: 20px;
 }
 
+h1 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
 #mode-buttons button,
 #restart-btn {
   margin: 5px;
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
+  border: 2px solid #333;
+  background-color: #fff;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+#mode-buttons button:hover,
+#restart-btn:hover {
+  background-color: #333;
+  color: #fff;
 }
 
 #board {
   margin: 20px auto;
-  background-color: #333;
+  background-color: #8B4513;
   display: grid;
   gap: 1px;
+  grid-template-columns: repeat(15, 1fr);
+  grid-template-rows: repeat(15, 1fr);
 }
 
 .cell {
-  background-color: #fff;
+  background-color: #DEB887;
   position: relative;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background-color: #D2A679;
 }
 
 .cell.dark {
-  background-color: #e4e4e4;
+  background-color: #D2A679;
+}
+
+.cell.dark:hover {
+  background-color: #C89968;
 }
 
 .stone {
@@ -42,8 +69,11 @@ body {
   height: 80%;
   border-radius: 50%;
   position: absolute;
-  top: 10%;
-  left: 10%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
 }
 
 .stone.black {
@@ -52,7 +82,7 @@ body {
 
 .stone.white {
   background-color: #fff;
-  border: 2px solid #000;
+  border: 1px solid #999;
 }
 
 .hidden {
@@ -60,27 +90,29 @@ body {
 }
 
 #message {
-  margin-top: 10px;
+  margin-top: 15px;
   font-size: 18px;
+  font-weight: bold;
+  color: #333;
   min-height: 1.5em;
 }
 
 /* Responsive layout: adapt board size for smaller screens */
 @media (min-width: 601px) {
   #board {
-    width: 80vmin;
-    height: 80vmin;
-    grid-template-columns: repeat(15, 1fr);
-    grid-template-rows: repeat(15, 1fr);
+    width: min(80vmin, 600px);
+    height: min(80vmin, 600px);
   }
 }
 
 @media (max-width: 600px) {
   #board {
-    width: 90vw;
-    height: 90vw;
-    grid-template-columns: repeat(15, 1fr);
-    grid-template-rows: repeat(15, 1fr);
-    gap: 2px;
+    width: 95vw;
+    height: 95vw;
+  }
+  
+  .stone {
+    width: 85%;
+    height: 85%;
   }
 }

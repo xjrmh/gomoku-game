@@ -1,5 +1,5 @@
 // Simplified Gomoku game implementation
-const boardSize = 15;
+let boardSize = 15;
 let board = [];
 let currentPlayer = 'black';
 let gameActive = false;
@@ -10,10 +10,57 @@ const messageEl = document.getElementById('message');
 const restartBtn = document.getElementById('restart-btn');
 const pvpBtn = document.getElementById('pvp-btn');
 const pvcBtn = document.getElementById('pvc-btn');
+const themeBtn = document.getElementById('theme-btn');
+const sizeUpBtn = document.getElementById('size-up-btn');
+const sizeDownBtn = document.getElementById('size-down-btn');
+
+// Theme colors: [background, light cell, dark cell]
+const themes = [
+  ['#8B4513', '#DEB887', '#D2A679'], // Traditional wood
+  ['#2C5F2D', '#97BC62', '#85A956'], // Green
+  ['#1E3A8A', '#60A5FA', '#3B82F6'], // Blue
+  ['#7C2D12', '#FCA5A5', '#F87171'], // Red
+  ['#4C1D95', '#C4B5FD', '#A78BFA'], // Purple
+  ['#064E3B', '#6EE7B7', '#34D399'], // Teal
+  ['#78350F', '#FCD34D', '#FBBF24'], // Amber
+  ['#1F2937', '#9CA3AF', '#6B7280'], // Gray
+];
+
+let currentThemeIndex = 0;
+
+// Audio context for sound effects
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+function playClickSound() {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.frequency.value = 800;
+  oscillator.type = 'sine';
+  
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.1);
+}
 
 pvpBtn.addEventListener('click', () => startGame(false));
 pvcBtn.addEventListener('click', () => startGame(true));
-restartBtn.addEventListener('click', () => resetGame());
+restartBtn.addEventListener('click', () => {
+  if (confirm('Are you sure you want to restart the game?')) {
+    resetGame();
+  }
+});
+themeBtn.addEventListener('click', () => changeTheme());
+sizeUpBtn.addEventListener('click', () => changeBoardSize(1));
+sizeDownBtn.addEventListener('click', () => changeBoardSize(-1));
+
+// Show initial page with empty board
+resetBoard();
 
 function startGame(computerMode) {
   vsComputer = computerMode;
@@ -29,8 +76,8 @@ function startGame(computerMode) {
 function resetBoard() {
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
   boardContainer.innerHTML = '';
-  boardContainer.style.gridTemplateColumns = 'repeat(' + boardSize + ', 1fr)';
-  boardContainer.style.gridTemplateRows = 'repeat(' + boardSize + ', 1fr)';
+  boardContainer.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
+  boardContainer.style.gridTemplateRows = `repeat(${boardSize}, 1fr)`;
   for (let r = 0; r < boardSize; r++) {
     for (let c = 0; c < boardSize; c++) {
       const cell = document.createElement('div');
@@ -42,17 +89,26 @@ function resetBoard() {
       boardContainer.appendChild(cell);
     }
   }
+  // Apply current theme colors
+  applyCurrentTheme();
 }
 
 function resetGame() {
   document.getElementById('mode-buttons').classList.remove('hidden');
-  boardContainer.classList.add('hidden');
+  boardContainer.classList.remove('hidden');
   restartBtn.classList.add('hidden');
   messageEl.textContent = '';
   gameActive = false;
+  // Clear and render an empty board
+  resetBoard();
 }
 
 function handleCellClick(event) {
+  // If game not active, start in PvP mode automatically
+  if (!gameActive) {
+    startGame(false);
+  }
+  
   if (!gameActive) return;
   const row = parseInt(event.currentTarget.dataset.row);
   const col = parseInt(event.currentTarget.dataset.col);
@@ -62,6 +118,10 @@ function handleCellClick(event) {
     endGame(currentPlayer === 'black' ? 'Black wins!' : vsComputer ? 'You win!' : 'White wins!');
     return;
   }
+  if (isBoardFull()) {
+    endGame("It's a draw!");
+    return;
+  }
   currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
   if (vsComputer && currentPlayer === 'white') {
     setTimeout(() => {
@@ -69,6 +129,10 @@ function handleCellClick(event) {
       placeStone(aiRow, aiCol, 'white');
       if (checkWin(aiRow, aiCol, 'white')) {
         endGame('Computer wins!');
+        return;
+      }
+      if (isBoardFull()) {
+        endGame("It's a draw!");
         return;
       }
       currentPlayer = 'black';
@@ -85,6 +149,7 @@ function placeStone(row, col, player) {
   const stone = document.createElement('div');
   stone.classList.add('stone', player);
   cell.appendChild(stone);
+  playClickSound();
 }
 
 function endGame(text) {
@@ -164,4 +229,75 @@ function hasNeighbor(r, c, distance) {
     }
   }
   return false;
+}
+
+function isBoardFull() {
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === null) return false;
+    }
+  }
+  return true;
+}
+
+function changeTheme() {
+  // Pick a random theme different from current
+  let newIndex;
+  do {
+    newIndex = Math.floor(Math.random() * themes.length);
+  } while (newIndex === currentThemeIndex && themes.length > 1);
+  
+  currentThemeIndex = newIndex;
+  applyCurrentTheme();
+}
+
+function applyCurrentTheme() {
+  const [bg, light, dark] = themes[currentThemeIndex];
+  
+  // Update CSS custom properties
+  boardContainer.style.backgroundColor = bg;
+  
+  // Update all cells while preserving stones
+  const cells = boardContainer.querySelectorAll('.cell');
+  cells.forEach((cell, index) => {
+    const row = Math.floor(index / boardSize);
+    const col = index % boardSize;
+    if ((row + col) % 2 === 1) {
+      cell.style.backgroundColor = dark;
+      // Update hover color
+      cell.dataset.hoverColor = getHoverColor(dark);
+    } else {
+      cell.style.backgroundColor = light;
+      // Update hover color
+      cell.dataset.hoverColor = getHoverColor(light);
+    }
+  });
+}
+
+function getHoverColor(color) {
+  // Darken the color slightly for hover effect
+  const hex = color.replace('#', '');
+  const r = Math.max(0, parseInt(hex.substr(0, 2), 16) - 20);
+  const g = Math.max(0, parseInt(hex.substr(2, 2), 16) - 20);
+  const b = Math.max(0, parseInt(hex.substr(4, 2), 16) - 20);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+function changeBoardSize(delta) {
+  const newSize = boardSize + delta;
+  
+  if (newSize < 5 || newSize > 25) {
+    messageEl.textContent = `Board size must be between 5 and 25 (current: ${boardSize})`;
+    setTimeout(() => {
+      messageEl.textContent = '';
+    }, 2000);
+    return;
+  }
+  
+  boardSize = newSize;
+  resetBoard();
+  messageEl.textContent = `Board size changed to ${boardSize}x${boardSize}`;
+  setTimeout(() => {
+    messageEl.textContent = '';
+  }, 2000);
 }
