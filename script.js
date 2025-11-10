@@ -125,15 +125,17 @@ function resetGame() {
 }
 
 function handleCellClick(event) {
+  const row = parseInt(event.currentTarget.dataset.row);
+  const col = parseInt(event.currentTarget.dataset.col);
+  
   // If game not active, start with previous mode (or PvP if first time)
   if (!gameActive) {
     startGame(previousMode);
   }
   
-  if (!gameActive) return;
-  const row = parseInt(event.currentTarget.dataset.row);
-  const col = parseInt(event.currentTarget.dataset.col);
+  // Check if cell is already occupied
   if (board[row][col] !== null) return;
+  
   placeStone(row, col, currentPlayer);
   if (checkWin(row, col, currentPlayer)) {
     endGame(currentPlayer === 'black' ? 'Black wins!' : vsComputer ? 'You win!' : 'White wins!');
@@ -399,23 +401,10 @@ function applyCurrentTheme() {
     const col = index % boardSize;
     if ((row + col) % 2 === 1) {
       cell.style.backgroundColor = dark;
-      // Update hover color
-      cell.dataset.hoverColor = getHoverColor(dark);
     } else {
       cell.style.backgroundColor = light;
-      // Update hover color
-      cell.dataset.hoverColor = getHoverColor(light);
     }
   });
-}
-
-function getHoverColor(color) {
-  // Darken the color slightly for hover effect
-  const hex = color.replace('#', '');
-  const r = Math.max(0, parseInt(hex.substr(0, 2), 16) - 20);
-  const g = Math.max(0, parseInt(hex.substr(2, 2), 16) - 20);
-  const b = Math.max(0, parseInt(hex.substr(4, 2), 16) - 20);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 function changeBoardSize(delta) {
@@ -472,6 +461,17 @@ function reverseMove() {
 
 function showHint() {
   if (!gameActive) return;
+  
+  // Don't show hint during AI's turn
+  if (vsComputer && currentPlayer === 'white') {
+    messageEl.textContent = "Wait for computer's turn";
+    setTimeout(() => {
+      if (gameActive) {
+        messageEl.textContent = 'Your turn';
+      }
+    }, 1000);
+    return;
+  }
   
   // Remove any existing hint
   const existingHint = document.querySelector('.hint-indicator');
