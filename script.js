@@ -246,13 +246,25 @@ function findBestMoveWithMinimax() {
     }
   }
   
-  // Use Minimax with limited depth for performance
-  const depth = 3; // Adjust depth based on performance (3-4 is good balance)
+  // Determine search depth based on game state (early vs late game)
+  const emptyCount = candidates.length;
+  let depth;
+  if (emptyCount > 200) {
+    depth = 4; // Early game - deeper search
+  } else if (emptyCount > 100) {
+    depth = 5; // Mid game - even deeper
+  } else {
+    depth = 6; // Late game - deepest search
+  }
+  
   let bestScore = -Infinity;
   let bestMove = candidates[0];
   
-  // Evaluate top candidates only (limit search space)
-  const topCandidates = candidates.slice(0, Math.min(15, candidates.length));
+  // Evaluate more candidates for better moves
+  const topCandidates = candidates.slice(0, Math.min(20, candidates.length));
+  
+  // Show thinking message
+  messageEl.textContent = 'Computer is thinking...';
   
   for (let [r, c] of topCandidates) {
     board[r][c] = 'white';
@@ -279,7 +291,8 @@ function minimax(depth, alpha, beta, isMaximizing) {
     return evaluateBoardState();
   }
   
-  const candidates = getCandidateMoves().slice(0, 10); // Limit branching factor
+  // Expand branching factor for deeper analysis
+  const candidates = getCandidateMoves().slice(0, 15); // More candidates per level
   
   if (isMaximizing) {
     let maxScore = -Infinity;
@@ -322,16 +335,55 @@ function checkBoardWin(player) {
 function evaluateBoardState() {
   let score = 0;
   
-  // Evaluate all positions on the board
+  // Evaluate all positions on the board with pattern detection
   for (let r = 0; r < boardSize; r++) {
     for (let c = 0; c < boardSize; c++) {
       if (board[r][c] === 'white') {
         score += evaluatePositionScore(r, c, 'white');
       } else if (board[r][c] === 'black') {
-        score -= evaluatePositionScore(r, c, 'black');
+        score -= evaluatePositionScore(r, c, 'black') * 1.05; // Slightly favor defense
       }
     }
   }
+  
+  // Add strategic bonuses
+  score += evaluateStrategicPatterns('white') - evaluateStrategicPatterns('black') * 1.05;
+  
+  return score;
+}
+
+function evaluateStrategicPatterns(player) {
+  let score = 0;
+  const opponent = player === 'white' ? 'black' : 'white';
+  
+  // Detect multiple threats (forcing moves)
+  let threeCount = 0;
+  let openThreeCount = 0;
+  
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === player) {
+        const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        for (let [dRow, dCol] of directions) {
+          const count = countConsecutive(r, c, dRow, dCol, player) + 
+                        countConsecutive(r, c, -dRow, -dCol, player) - 1;
+          
+          if (count === 3) {
+            const open1 = isOpen(r, c, dRow, dCol, player);
+            const open2 = isOpen(r, c, -dRow, -dCol, player);
+            if (open1 && open2) {
+              openThreeCount++;
+            }
+            threeCount++;
+          }
+        }
+      }
+    }
+  }
+  
+  // Multiple open threes is very strong (double threat)
+  if (openThreeCount >= 2) score += 3000;
+  if (threeCount >= 3) score += 1000;
   
   return score;
 }
@@ -349,11 +401,13 @@ function evaluatePositionScore(row, col, player) {
     } else if (count === 4) {
       const open1 = isOpen(row, col, dRow, dCol, player);
       const open2 = isOpen(row, col, -dRow, -dCol, player);
-      score += (open1 && open2) ? 5000 : (open1 || open2) ? 1000 : 100;
+      // Heavily favor open four (guaranteed win)
+      score += (open1 && open2) ? 10000 : (open1 || open2) ? 2000 : 150;
     } else if (count === 3) {
       const open1 = isOpen(row, col, dRow, dCol, player);
       const open2 = isOpen(row, col, -dRow, -dCol, player);
-      score += (open1 && open2) ? 500 : (open1 || open2) ? 100 : 10;
+      // Open three on both sides is very strong
+      score += (open1 && open2) ? 800 : (open1 || open2) ? 150 : 15;
     } else if (count === 2) {
       const open1 = isOpen(row, col, dRow, dCol, player);
       const open2 = isOpen(row, col, -dRow, -dCol, player);
