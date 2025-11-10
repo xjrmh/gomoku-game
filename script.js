@@ -4,6 +4,7 @@ let board = [];
 let currentPlayer = 'black';
 let gameActive = false;
 let vsComputer = false;
+let aiVsAi = false; // Track AI vs AI mode
 let previousMode = false; // Track previous mode (false = PvP, true = vs Computer)
 let moveHistory = []; // Track move history for undo
 
@@ -17,10 +18,14 @@ const pvcBtn = document.getElementById('pvc-btn');
 const themeBtn = document.getElementById('theme-btn');
 const sizeUpBtn = document.getElementById('size-up-btn');
 const sizeDownBtn = document.getElementById('size-down-btn');
+const maximizeBtn = document.getElementById('maximize-btn');
+const containerEl = document.querySelector('.container');
 const titleEl = document.querySelector('h1');
 const fireworksCanvas = document.getElementById('fireworks');
 const fireworksCtx = fireworksCanvas.getContext('2d');
 const victoryMessageEl = document.getElementById('victory-message');
+
+let isMaximized = false;
 
 // Theme colors: [background, light cell, dark cell]
 const themes = [
@@ -57,36 +62,184 @@ function playClickSound() {
 }
 
 pvpBtn.addEventListener('click', () => startGame(false));
-pvcBtn.addEventListener('click', () => startGame(true));
-restartBtn.addEventListener('click', () => {
-  if (confirm('Are you sure you want to restart the game?')) {
-    resetGame();
-  }
+
+// Long press support for AI Mode button to enable AI vs AI
+let longPressTimerAI;
+pvcBtn.addEventListener('mousedown', () => {
+  longPressTimerAI = setTimeout(() => {
+    startGame('ai-vs-ai');
+  }, 500);
 });
+pvcBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerAI));
+pvcBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerAI));
+pvcBtn.addEventListener('click', () => startGame(true));
+
+// Touch support for mobile
+pvcBtn.addEventListener('touchstart', () => {
+  longPressTimerAI = setTimeout(() => {
+    startGame('ai-vs-ai');
+  }, 500);
+});
+pvcBtn.addEventListener('touchend', () => clearTimeout(longPressTimerAI));
+pvcBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerAI));
+
+restartBtn.addEventListener('click', () => resetGame());
 reverseBtn.addEventListener('click', () => reverseMove());
 helpBtn.addEventListener('click', () => showHint());
+
+// Long press support for theme button
+let longPressTimerTheme;
+themeBtn.addEventListener('mousedown', () => {
+  longPressTimerTheme = setTimeout(() => {
+    // Long press: reset to default theme (index 0)
+    currentThemeIndex = 0;
+    applyCurrentTheme();
+  }, 500);
+});
+themeBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerTheme));
+themeBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerTheme));
 themeBtn.addEventListener('click', () => changeTheme());
+
+// Touch support for mobile
+themeBtn.addEventListener('touchstart', () => {
+  longPressTimerTheme = setTimeout(() => {
+    currentThemeIndex = 0;
+    applyCurrentTheme();
+  }, 500);
+});
+themeBtn.addEventListener('touchend', () => clearTimeout(longPressTimerTheme));
+themeBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerTheme));
+
+// Long press support for size-up button
+let longPressTimer;
+sizeUpBtn.addEventListener('mousedown', () => {
+  longPressTimer = setTimeout(() => {
+    // Long press: set to max size 25x25
+    boardSize = 25;
+    resetBoard();
+  }, 500); // 500ms to trigger long press
+});
+sizeUpBtn.addEventListener('mouseup', () => clearTimeout(longPressTimer));
+sizeUpBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimer));
 sizeUpBtn.addEventListener('click', () => changeBoardSize(1));
+
+// Touch support for mobile
+sizeUpBtn.addEventListener('touchstart', () => {
+  longPressTimer = setTimeout(() => {
+    boardSize = 25;
+    resetBoard();
+  }, 500);
+});
+sizeUpBtn.addEventListener('touchend', () => clearTimeout(longPressTimer));
+sizeUpBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimer));
+
 sizeDownBtn.addEventListener('click', () => changeBoardSize(-1));
+
+// Long press support for size-down button
+let longPressTimerDown;
+sizeDownBtn.addEventListener('mousedown', () => {
+  longPressTimerDown = setTimeout(() => {
+    // Long press: set to default size 15x15
+    boardSize = 15;
+    resetBoard();
+  }, 500);
+});
+sizeDownBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerDown));
+sizeDownBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerDown));
+
+// Touch support for mobile
+sizeDownBtn.addEventListener('touchstart', () => {
+  longPressTimerDown = setTimeout(() => {
+    boardSize = 15;
+    resetBoard();
+  }, 500);
+});
+sizeDownBtn.addEventListener('touchend', () => clearTimeout(longPressTimerDown));
+sizeDownBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerDown));
+
+maximizeBtn.addEventListener('click', () => toggleMaximize());
+
+function toggleMaximize() {
+  isMaximized = !isMaximized;
+  if (isMaximized) {
+    containerEl.classList.add('maximized');
+  } else {
+    containerEl.classList.remove('maximized');
+  }
+  
+  // Force complete board re-render immediately
+  const currentBoard = board.map(row => [...row]); // Save current state
+  boardContainer.innerHTML = ''; // Clear board
+  
+  // Recreate all cells
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      const cell = document.createElement('div');
+      cell.classList.add('cell');
+      if ((r + c) % 2 === 1) cell.classList.add('dark');
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.addEventListener('click', handleCellClick);
+      boardContainer.appendChild(cell);
+      
+      // Restore stone if it existed
+      if (currentBoard[r][c]) {
+        const stone = document.createElement('div');
+        stone.classList.add('stone', currentBoard[r][c]);
+        cell.appendChild(stone);
+      }
+    }
+  }
+  
+  // Reapply theme
+  applyCurrentTheme();
+}
 
 // Show initial page with empty board
 resetBoard();
 
 function startGame(computerMode) {
-  vsComputer = computerMode;
-  previousMode = computerMode; // Save the mode
+  // Handle AI vs AI mode
+  if (computerMode === 'ai-vs-ai') {
+    vsComputer = false;
+    aiVsAi = true;
+    previousMode = 'ai-vs-ai';
+  } else {
+    vsComputer = computerMode;
+    aiVsAi = false;
+    previousMode = computerMode;
+  }
+  
   document.getElementById('mode-buttons').classList.add('hidden');
   boardContainer.classList.remove('hidden');
   restartBtn.classList.remove('hidden');
   reverseBtn.classList.remove('hidden');
   helpBtn.classList.remove('hidden');
+  
+  // Move maximize button to game-buttons (after Help Me)
+  document.getElementById('game-buttons').appendChild(maximizeBtn);
+  
   resetBoard();
   gameActive = true;
   currentPlayer = 'black';
   moveHistory = []; // Clear move history
-  messageEl.textContent = vsComputer ? 'Your turn' : 'Black starts';
   
-  // Keep title consistent - don't change it
+  // Update title and page title based on mode
+  if (aiVsAi) {
+    messageEl.textContent = 'AI vs AI';
+    titleEl.textContent = 'Gomoku 五子棋 - AI vs AI';
+    document.title = 'Gomoku 五子棋 - AI vs AI';
+    // Start AI vs AI game
+    setTimeout(() => makeAiVsAiMove(), 500);
+  } else if (vsComputer) {
+    messageEl.textContent = 'Your turn';
+    titleEl.textContent = 'Gomoku 五子棋 - AI Mode';
+    document.title = 'Gomoku 五子棋 - AI Mode';
+  } else {
+    messageEl.textContent = 'Black starts';
+    titleEl.textContent = 'Gomoku 五子棋 - PvP';
+    document.title = 'Gomoku 五子棋 - PvP';
+  }
 }
 
 function resetBoard() {
@@ -115,16 +268,26 @@ function resetGame() {
   restartBtn.classList.add('hidden');
   reverseBtn.classList.add('hidden');
   helpBtn.classList.add('hidden');
+  
+  // Move maximize button back to mode-buttons (after Size +)
+  document.getElementById('mode-buttons').appendChild(maximizeBtn);
+  
   messageEl.textContent = '';
   gameActive = false;
+  aiVsAi = false; // Reset AI vs AI mode
   moveHistory = []; // Clear move history
   // Clear and render an empty board
   resetBoard();
   
-  // Keep title consistent - don't change it
+  // Reset title and page title to default
+  titleEl.textContent = 'Gomoku 五子棋';
+  document.title = 'Gomoku 五子棋';
 }
 
 function handleCellClick(event) {
+  // Don't allow manual clicks in AI vs AI mode
+  if (aiVsAi) return;
+  
   const row = parseInt(event.currentTarget.dataset.row);
   const col = parseInt(event.currentTarget.dataset.col);
   
@@ -147,6 +310,7 @@ function handleCellClick(event) {
   }
   currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
   if (vsComputer && currentPlayer === 'white') {
+    messageEl.textContent = 'AI thinking...';
     setTimeout(() => {
       const [aiRow, aiCol] = chooseAIMove();
       placeStone(aiRow, aiCol, 'white');
@@ -164,6 +328,32 @@ function handleCellClick(event) {
   } else {
     messageEl.textContent = currentPlayer === 'black' ? "Black's turn" : "White's turn";
   }
+}
+
+// Function to handle AI vs AI gameplay
+function makeAiVsAiMove() {
+  if (!gameActive || !aiVsAi) return;
+  
+  messageEl.textContent = `${currentPlayer === 'black' ? 'Black' : 'White'} AI thinking...`;
+  
+  setTimeout(() => {
+    const [aiRow, aiCol] = chooseAIMove();
+    placeStone(aiRow, aiCol, currentPlayer);
+    
+    if (checkWin(aiRow, aiCol, currentPlayer)) {
+      endGame(`${currentPlayer === 'black' ? 'Black' : 'White'} AI wins!`);
+      return;
+    }
+    
+    if (isBoardFull()) {
+      endGame("It's a draw!");
+      return;
+    }
+    
+    // Switch player and continue
+    currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+    makeAiVsAiMove();
+  }, 500);
 }
 
 function placeStone(row, col, player) {
