@@ -4,6 +4,7 @@ let board = [];
 let currentPlayer = 'black';
 let gameActive = false;
 let vsComputer = false;
+let previousMode = false; // Track previous mode (false = PvP, true = vs Computer)
 
 const boardContainer = document.getElementById('board');
 const messageEl = document.getElementById('message');
@@ -13,6 +14,10 @@ const pvcBtn = document.getElementById('pvc-btn');
 const themeBtn = document.getElementById('theme-btn');
 const sizeUpBtn = document.getElementById('size-up-btn');
 const sizeDownBtn = document.getElementById('size-down-btn');
+const titleEl = document.querySelector('h1');
+const fireworksCanvas = document.getElementById('fireworks');
+const fireworksCtx = fireworksCanvas.getContext('2d');
+const victoryMessageEl = document.getElementById('victory-message');
 
 // Theme colors: [background, light cell, dark cell]
 const themes = [
@@ -64,6 +69,7 @@ resetBoard();
 
 function startGame(computerMode) {
   vsComputer = computerMode;
+  previousMode = computerMode; // Save the mode
   document.getElementById('mode-buttons').classList.add('hidden');
   boardContainer.classList.remove('hidden');
   restartBtn.classList.remove('hidden');
@@ -71,6 +77,11 @@ function startGame(computerMode) {
   gameActive = true;
   currentPlayer = 'black';
   messageEl.textContent = vsComputer ? 'Your turn' : 'Black starts';
+  
+  // Update page title and h1 title
+  const modeText = vsComputer ? 'AI Mode' : 'PvP';
+  document.title = `Gomoku - ${modeText}`;
+  titleEl.textContent = `Gomoku - ${modeText}`;
 }
 
 function resetBoard() {
@@ -101,12 +112,16 @@ function resetGame() {
   gameActive = false;
   // Clear and render an empty board
   resetBoard();
+  
+  // Reset page title and h1 title
+  document.title = 'Gomoku Game';
+  titleEl.textContent = 'Gomoku';
 }
 
 function handleCellClick(event) {
-  // If game not active, start in PvP mode automatically
+  // If game not active, start with previous mode (or PvP if first time)
   if (!gameActive) {
-    startGame(false);
+    startGame(previousMode);
   }
   
   if (!gameActive) return;
@@ -155,6 +170,7 @@ function placeStone(row, col, player) {
 function endGame(text) {
   gameActive = false;
   messageEl.textContent = text;
+  showFireworks(text);
 }
 
 function checkWin(row, col, player) {
@@ -179,26 +195,129 @@ function countConsecutive(row, col, dRow, dCol, player) {
 }
 
 function chooseAIMove() {
+  // Check for immediate win
   let move = findWinningMove('white');
   if (move) return move;
+  
+  // Block opponent's winning move
   move = findWinningMove('black');
   if (move) return move;
-  const candidates = [];
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      if (board[r][c] === null && hasNeighbor(r, c, 2)) candidates.push([r, c]);
+  
+  // Use advanced evaluation for strategic moves
+  return findBestMove();
+}
+
+function findBestMove() {
+  let bestScore = -Infinity;
+  let bestMove = null;
+  const candidates = getCandidateMoves();
+  
+  // If board is empty or nearly empty, play near center
+  if (candidates.length > boardSize * boardSize - 3) {
+    const center = Math.floor(boardSize / 2);
+    if (board[center][center] === null) return [center, center];
+    // Try positions near center
+    const nearCenter = [
+      [center - 1, center], [center + 1, center],
+      [center, center - 1], [center, center + 1],
+      [center - 1, center - 1], [center + 1, center + 1],
+      [center - 1, center + 1], [center + 1, center - 1]
+    ];
+    for (let [r, c] of nearCenter) {
+      if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null) {
+        return [r, c];
+      }
     }
   }
-  if (candidates.length) {
-    return candidates[Math.floor(Math.random() * candidates.length)];
-  }
-  const empties = [];
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      if (board[r][c] === null) empties.push([r, c]);
+  
+  // Evaluate top candidates
+  for (let [r, c] of candidates.slice(0, Math.min(10, candidates.length))) {
+    const score = evaluatePosition(r, c, 'white') + evaluatePosition(r, c, 'black') * 1.1;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = [r, c];
     }
   }
-  return empties[Math.floor(Math.random() * empties.length)];
+  
+  return bestMove || candidates[0];
+}
+
+function getCandidateMoves() {
+  const moves = [];
+  const scored = [];
+  
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === null && hasNeighbor(r, c, 2)) {
+        const score = evaluatePosition(r, c, 'white') + evaluatePosition(r, c, 'black');
+        scored.push({ move: [r, c], score });
+      }
+    }
+  }
+  
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score);
+  
+  if (scored.length > 0) {
+    return scored.map(s => s.move);
+  }
+  
+  // Fallback: return all empty positions
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === null) moves.push([r, c]);
+    }
+  }
+  return moves;
+}
+
+function evaluatePosition(row, col, player) {
+  board[row][col] = player;
+  let score = 0;
+  
+  // Check all directions
+  const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  
+  for (let [dRow, dCol] of directions) {
+    const count = countConsecutive(row, col, dRow, dCol, player) + 
+                  countConsecutive(row, col, -dRow, -dCol, player) - 1;
+    
+    if (count >= 5) {
+      score += 100000; // Winning move
+    } else if (count === 4) {
+      // Check if open on both ends
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 10000 : 5000;
+    } else if (count === 3) {
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 1000 : 500;
+    } else if (count === 2) {
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 100 : 50;
+    } else {
+      score += 10;
+    }
+  }
+  
+  board[row][col] = null;
+  return score;
+}
+
+function isOpen(row, col, dRow, dCol, player) {
+  let r = row;
+  let c = col;
+  
+  // Move to the end of consecutive stones
+  while (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === player) {
+    r += dRow;
+    c += dCol;
+  }
+  
+  // Check if the next position is empty
+  return r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null;
 }
 
 function findWinningMove(player) {
@@ -300,4 +419,90 @@ function changeBoardSize(delta) {
   setTimeout(() => {
     messageEl.textContent = '';
   }, 2000);
+}
+
+// Fireworks animation
+function showFireworks(victoryText) {
+  // Show victory message
+  victoryMessageEl.textContent = victoryText;
+  victoryMessageEl.classList.add('active');
+  
+  fireworksCanvas.width = window.innerWidth;
+  fireworksCanvas.height = window.innerHeight;
+  fireworksCanvas.classList.add('active');
+  
+  const particles = [];
+  const particleCount = 100;
+  const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#8b00ff', '#ff1493'];
+  
+  class Particle {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 10;
+      this.vy = (Math.random() - 0.5) * 10;
+      this.alpha = 1;
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+      this.size = Math.random() * 3 + 2;
+    }
+    
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.2; // gravity
+      this.alpha -= 0.01;
+    }
+    
+    draw() {
+      fireworksCtx.save();
+      fireworksCtx.globalAlpha = this.alpha;
+      fireworksCtx.fillStyle = this.color;
+      fireworksCtx.beginPath();
+      fireworksCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      fireworksCtx.fill();
+      fireworksCtx.restore();
+    }
+  }
+  
+  // Create multiple firework bursts
+  function createBurst(x, y) {
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle(x, y));
+    }
+  }
+  
+  // Create several bursts
+  createBurst(window.innerWidth * 0.3, window.innerHeight * 0.3);
+  setTimeout(() => createBurst(window.innerWidth * 0.7, window.innerHeight * 0.4), 300);
+  setTimeout(() => createBurst(window.innerWidth * 0.5, window.innerHeight * 0.25), 600);
+  setTimeout(() => createBurst(window.innerWidth * 0.4, window.innerHeight * 0.5), 900);
+  setTimeout(() => createBurst(window.innerWidth * 0.6, window.innerHeight * 0.35), 1200);
+  
+  function animate() {
+    fireworksCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
+    
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      particles[i].draw();
+      
+      if (particles[i].alpha <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+    
+    if (particles.length > 0) {
+      requestAnimationFrame(animate);
+    } else {
+      fireworksCanvas.classList.remove('active');
+    }
+  }
+  
+  animate();
+  
+  // Hide after 3 seconds
+  setTimeout(() => {
+    fireworksCanvas.classList.remove('active');
+    victoryMessageEl.classList.remove('active');
+    particles.length = 0;
+  }, 3000);
 }

@@ -9,15 +9,17 @@
 <body>
 <div class="container">
   <h1>Gomoku</h1>
+  <div id="message"></div>
   <div id="mode-buttons">
-    <button id="pvp-btn">2 Players</button>
-    <button id="pvc-btn">1 Player</button>
+    <button id="pvp-btn">PvP</button>
+    <button id="pvc-btn">AI Mode</button>
     <button id="theme-btn">Theme</button>
     <button id="size-down-btn">Size -</button>
     <button id="size-up-btn">Size +</button>
   </div>
   <div id="board"></div>
-  <div id="message"></div>
+  <canvas id="fireworks"></canvas>
+  <div id="victory-message"></div>
   <button id="restart-btn" class="hidden">Restart</button>
 </div>
 <script src="script.js"></script>

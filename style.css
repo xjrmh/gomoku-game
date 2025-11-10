@@ -15,7 +15,15 @@ body {
 
 h1 {
   color: #333;
-  margin-bottom: 20px;
+  margin-bottom: 5px;
+}
+
+#message {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  min-height: 1.5em;
 }
 
 #mode-buttons button,
@@ -89,12 +97,49 @@ h1 {
   display: none;
 }
 
-#message {
-  margin-top: 15px;
-  font-size: 18px;
+#fireworks {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+}
+
+#fireworks.active {
+  display: block;
+}
+
+#victory-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
   font-weight: bold;
-  color: #333;
-  min-height: 1.5em;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.8),
+               0 0 40px rgba(255, 215, 0, 0.6),
+               2px 2px 4px rgba(0, 0, 0, 0.9);
+  z-index: 1001;
+  display: none;
+  pointer-events: none;
+  animation: victoryPulse 1s ease-in-out infinite;
+}
+
+#victory-message.active {
+  display: block;
+}
+
+@keyframes victoryPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
 }
 
 /* Responsive layout: adapt board size for smaller screens */
