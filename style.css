@@ -1,0 +1,86 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f8f8f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.container {
+  text-align: center;
+  padding: 20px;
+}
+
+#mode-buttons button,
+#restart-btn {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#board {
+  margin: 20px auto;
+  background-color: #333;
+  display: grid;
+  gap: 1px;
+}
+
+.cell {
+  background-color: #fff;
+  position: relative;
+}
+
+.cell.dark {
+  background-color: #e4e4e4;
+}
+
+.stone {
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  position: absolute;
+  top: 10%;
+  left: 10%;
+}
+
+.stone.black {
+  background-color: #000;
+}
+
+.stone.white {
+  background-color: #fff;
+  border: 2px solid #000;
+}
+
+.hidden {
+  display: none;
+}
+
+#message {
+  margin-top: 10px;
+  font-size: 18px;
+  min-height: 1.5em;
+}
+
+/* Responsive layout: adapt board size for smaller screens */
+@media (min-width: 601px) {
+  #board {
+    width: 80vmin;
+    height: 80vmin;
+    grid-template-columns: repeat(15, 1fr);
+    grid-template-rows: repeat(15, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  #board {
+    width: 90vw;
+    height: 90vw;
+    grid-template-columns: repeat(15, 1fr);
+    grid-template-rows: repeat(15, 1fr);
+    gap: 2px;
+  }
+}
