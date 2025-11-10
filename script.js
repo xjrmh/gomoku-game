@@ -86,10 +86,7 @@ function startGame(computerMode) {
   moveHistory = []; // Clear move history
   messageEl.textContent = vsComputer ? 'Your turn' : 'Black starts';
   
-  // Update page title and h1 title
-  const modeText = vsComputer ? 'AI Mode' : 'PvP';
-  document.title = `Gomoku - ${modeText}`;
-  titleEl.textContent = `Gomoku - ${modeText}`;
+  // Keep title consistent - don't change it
 }
 
 function resetBoard() {
@@ -124,9 +121,7 @@ function resetGame() {
   // Clear and render an empty board
   resetBoard();
   
-  // Reset page title and h1 title
-  document.title = 'Gomoku Game';
-  titleEl.textContent = 'Gomoku';
+  // Keep title consistent - don't change it
 }
 
 function handleCellClick(event) {
