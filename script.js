@@ -221,8 +221,149 @@ function chooseAIMove() {
   move = findWinningMove('black');
   if (move) return move;
   
-  // Use advanced evaluation for strategic moves
-  return findBestMove();
+  // Use Minimax with Alpha-Beta pruning for strategic moves
+  return findBestMoveWithMinimax();
+}
+
+function findBestMoveWithMinimax() {
+  const candidates = getCandidateMoves();
+  
+  // If board is empty or nearly empty, play near center
+  if (candidates.length > boardSize * boardSize - 3) {
+    const center = Math.floor(boardSize / 2);
+    if (board[center][center] === null) return [center, center];
+    // Try positions near center
+    const nearCenter = [
+      [center - 1, center], [center + 1, center],
+      [center, center - 1], [center, center + 1],
+      [center - 1, center - 1], [center + 1, center + 1],
+      [center - 1, center + 1], [center + 1, center - 1]
+    ];
+    for (let [r, c] of nearCenter) {
+      if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === null) {
+        return [r, c];
+      }
+    }
+  }
+  
+  // Use Minimax with limited depth for performance
+  const depth = 3; // Adjust depth based on performance (3-4 is good balance)
+  let bestScore = -Infinity;
+  let bestMove = candidates[0];
+  
+  // Evaluate top candidates only (limit search space)
+  const topCandidates = candidates.slice(0, Math.min(15, candidates.length));
+  
+  for (let [r, c] of topCandidates) {
+    board[r][c] = 'white';
+    const score = minimax(depth - 1, -Infinity, Infinity, false);
+    board[r][c] = null;
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = [r, c];
+    }
+  }
+  
+  return bestMove;
+}
+
+function minimax(depth, alpha, beta, isMaximizing) {
+  // Check for terminal states
+  const whiteWin = checkBoardWin('white');
+  const blackWin = checkBoardWin('black');
+  
+  if (whiteWin) return 100000 + depth; // Prefer faster wins
+  if (blackWin) return -100000 - depth; // Prefer slower losses
+  if (depth === 0 || isBoardFull()) {
+    return evaluateBoardState();
+  }
+  
+  const candidates = getCandidateMoves().slice(0, 10); // Limit branching factor
+  
+  if (isMaximizing) {
+    let maxScore = -Infinity;
+    for (let [r, c] of candidates) {
+      board[r][c] = 'white';
+      const score = minimax(depth - 1, alpha, beta, false);
+      board[r][c] = null;
+      
+      maxScore = Math.max(maxScore, score);
+      alpha = Math.max(alpha, score);
+      if (beta <= alpha) break; // Beta cutoff
+    }
+    return maxScore;
+  } else {
+    let minScore = Infinity;
+    for (let [r, c] of candidates) {
+      board[r][c] = 'black';
+      const score = minimax(depth - 1, alpha, beta, true);
+      board[r][c] = null;
+      
+      minScore = Math.min(minScore, score);
+      beta = Math.min(beta, score);
+      if (beta <= alpha) break; // Alpha cutoff
+    }
+    return minScore;
+  }
+}
+
+function checkBoardWin(player) {
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === player && checkWin(r, c, player)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function evaluateBoardState() {
+  let score = 0;
+  
+  // Evaluate all positions on the board
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === 'white') {
+        score += evaluatePositionScore(r, c, 'white');
+      } else if (board[r][c] === 'black') {
+        score -= evaluatePositionScore(r, c, 'black');
+      }
+    }
+  }
+  
+  return score;
+}
+
+function evaluatePositionScore(row, col, player) {
+  let score = 0;
+  const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  
+  for (let [dRow, dCol] of directions) {
+    const count = countConsecutive(row, col, dRow, dCol, player) + 
+                  countConsecutive(row, col, -dRow, -dCol, player) - 1;
+    
+    if (count >= 5) {
+      score += 100000;
+    } else if (count === 4) {
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 5000 : (open1 || open2) ? 1000 : 100;
+    } else if (count === 3) {
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 500 : (open1 || open2) ? 100 : 10;
+    } else if (count === 2) {
+      const open1 = isOpen(row, col, dRow, dCol, player);
+      const open2 = isOpen(row, col, -dRow, -dCol, player);
+      score += (open1 && open2) ? 50 : 5;
+    } else {
+      score += 1;
+    }
+  }
+  
+  return score;
 }
 
 function findBestMove() {
