@@ -2,21 +2,25 @@
 function checkLandscapeLock() {
   const lock = document.getElementById('landscape-lock');
   const container = document.querySelector('.container');
+  const board = document.getElementById('board');
   const isMobile = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   const isLandscape = window.innerWidth > window.innerHeight;
-  if (isMobile && isLandscape) {
-    lock.classList.remove('hidden');
-    lock.style.display = 'flex';
-    // Only hide the game content, not the lock message
+  const isTooShort = window.innerHeight < 420; // px threshold for too little vertical space
+  if (isMobile && (isLandscape || isTooShort)) {
+    // Hide all children except board
     Array.from(container.children).forEach(child => {
-      if (child !== lock) child.style.display = 'none';
+      if (child !== board) child.style.display = 'none';
     });
+    board.style.display = '';
+    // Maximize board
+    if (!container.classList.contains('maximized')) container.classList.add('maximized');
   } else {
-    lock.classList.add('hidden');
-    lock.style.display = 'none';
+    // Restore all children
     Array.from(container.children).forEach(child => {
-      if (child !== lock) child.style.display = '';
+      child.style.display = '';
     });
+    // Remove maximize if not in maximize mode
+    if (container.classList.contains('maximized')) container.classList.remove('maximized');
   }
 }
 
@@ -427,7 +431,7 @@ function startGame(computerMode) {
     setTimeout(() => makeAiVsAiMove(), 500);
   } else if (vsComputer) {
     messageEl.textContent = 'Your turn';
-    titleEl.textContent = 'Gomoku 五子棋 - AI Mode';
+    titleEl.textContent = 'Gomoku 五子棋 - AI';
     document.title = 'Gomoku 五子棋 - AI Mode';
     pauseAiBtn.classList.add('hidden');
   } else {
