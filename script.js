@@ -123,7 +123,39 @@ pvcBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerAI));
 
 restartBtn.addEventListener('click', () => resetGame());
 reverseBtn.addEventListener('click', () => reverseMove());
-helpBtn.addEventListener('click', () => showHint());
+
+// Long press support for Help Me button
+let longPressTimerHelp;
+let longPressTriggeredHelp = false;
+helpBtn.addEventListener('mousedown', () => {
+  longPressTriggeredHelp = false;
+  longPressTimerHelp = setTimeout(() => {
+    longPressTriggeredHelp = true;
+    // Long press: place stone at AI recommendation
+    autoPlaceHint();
+  }, 500);
+});
+helpBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerHelp));
+helpBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerHelp));
+helpBtn.addEventListener('click', (e) => {
+  if (longPressTriggeredHelp) {
+    e.preventDefault();
+    return;
+  }
+  showHint();
+});
+
+// Touch support for mobile
+helpBtn.addEventListener('touchstart', () => {
+  longPressTriggeredHelp = false;
+  longPressTimerHelp = setTimeout(() => {
+    longPressTriggeredHelp = true;
+    autoPlaceHint();
+  }, 500);
+});
+helpBtn.addEventListener('touchend', () => clearTimeout(longPressTimerHelp));
+helpBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerHelp));
+
 pauseAiBtn.addEventListener('click', () => toggleAiVsAiPause());
 
 // Long press support for theme button
@@ -269,12 +301,25 @@ maximizeBtn.addEventListener('click', () => toggleMaximize());
 
 // Keyboard shortcut: Press 'f' to toggle maximize mode
 document.addEventListener('keydown', (event) => {
+  // Press 'f' to toggle maximize
   if (event.key === 'f' || event.key === 'F') {
     toggleMaximize();
   }
-  // Press 'h' to show hint
-  if (event.key === 'h' || event.key === 'H') {
+  // Press 'h' to show hint (only when no modifier keys)
+  if ((event.key === 'h' || event.key === 'H') && !event.ctrlKey && !event.metaKey) {
     showHint();
+  }
+  // Press Ctrl+H (Windows/Linux) or Command+H (Mac) to auto-place hint
+  if ((event.ctrlKey || event.metaKey) && (event.key === 'h' || event.key === 'H')) {
+    event.preventDefault(); // Prevent browser's default behavior (Command+H hides window on Mac)
+    event.stopPropagation();
+    autoPlaceHint();
+  }
+  // Press Ctrl+Z (Windows/Linux) or Command+Z (Mac) to undo
+  if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z')) {
+    event.preventDefault(); // Prevent browser's default undo behavior
+    event.stopPropagation();
+    reverseMove();
   }
 });
 
@@ -1075,6 +1120,78 @@ function showHint() {
         (currentPlayer === 'black' ? "Black's turn" : "White's turn");
     }
   }, 3000);
+}
+
+function autoPlaceHint() {
+  if (!gameActive) return;
+  
+  // Don't allow during AI's turn
+  if (vsComputer && currentPlayer === 'white') {
+    messageEl.textContent = "Wait for computer's turn";
+    setTimeout(() => {
+      if (gameActive) {
+        messageEl.textContent = 'Your turn';
+      }
+    }, 1000);
+    return;
+  }
+  
+  // Don't allow in AI vs AI mode
+  if (aiVsAi) return;
+  
+  // Get best move using AI evaluation
+  const bestMove = findBestMove();
+  if (!bestMove) return;
+  
+  const [row, col] = bestMove;
+  
+  // Check if cell is already occupied
+  if (board[row][col] !== null) return;
+  
+  // Remove any existing hint
+  const existingHint = document.querySelector('.hint-indicator');
+  if (existingHint) {
+    existingHint.remove();
+  }
+  
+  // Place stone at recommended position
+  placeStone(row, col, currentPlayer);
+  messageEl.textContent = 'AI recommendation placed';
+  
+  if (checkWin(row, col, currentPlayer)) {
+    endGame(currentPlayer === 'black' ? 'Black wins!' : vsComputer ? 'You win!' : 'White wins!');
+    return;
+  }
+  if (isBoardFull()) {
+    endGame("It's a draw!");
+    return;
+  }
+  
+  currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+  
+  if (vsComputer && currentPlayer === 'white') {
+    messageEl.textContent = 'AI thinking...';
+    setTimeout(() => {
+      const [aiRow, aiCol] = chooseAIMove();
+      placeStone(aiRow, aiCol, 'white');
+      if (checkWin(aiRow, aiCol, 'white')) {
+        endGame('Computer wins!');
+        return;
+      }
+      if (isBoardFull()) {
+        endGame("It's a draw!");
+        return;
+      }
+      currentPlayer = 'black';
+      messageEl.textContent = 'Your turn';
+    }, 200);
+  } else {
+    setTimeout(() => {
+      if (gameActive) {
+        messageEl.textContent = currentPlayer === 'black' ? "Black's turn" : "White's turn";
+      }
+    }, 2000);
+  }
 }
 
 // Fireworks animation
