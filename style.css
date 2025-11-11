@@ -15,6 +15,28 @@ body {
   width: 100%;
 }
 
+/* Landscape lock overlay for mobile */
+#landscape-lock {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255,255,255,0.8);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  color: #222;
+  text-align: center;
+  pointer-events: all;
+}
+
+#landscape-lock.hidden {
+  display: none !important;
+}
+
 .container {
   text-align: center;
   padding: 5px 20px 20px 20px;
@@ -22,6 +44,7 @@ body {
   overflow-x: hidden;
   box-sizing: border-box;
   transition: padding 0.15s ease;
+  z-index: 1;
 }
 
 .container.maximized {
@@ -34,7 +57,9 @@ h1 {
   margin-top: 0;
   height: 2em;
   line-height: 2em;
-  transition: all 0.15s ease;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.4s cubic-bezier(.4,0,.2,1), height 0.3s cubic-bezier(.4,0,.2,1), margin 0.3s, transform 0.4s cubic-bezier(.4,0,.2,1);
 }
 
 .container.maximized h1 {
@@ -42,6 +67,7 @@ h1 {
   margin: 0;
   overflow: hidden;
   opacity: 0;
+  transform: scale(0.95) translateY(-20px);
 }
 
 #message {
@@ -105,18 +131,22 @@ h1 {
   min-width: max-content;
 }
 
+
 #mode-buttons button,
 #game-buttons button {
   margin: 5px;
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
-  border: 2px solid #333;
-  background-color: #fff;
-  border-radius: 5px;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  border: 1px solid #e0e0e0;
+  background-color: #f9f9f9;
+  border-radius: 7px;
+  color: #222;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
   line-height: 1;
   vertical-align: middle;
+  outline: none;
 }
 
 #maximize-btn {
@@ -126,8 +156,9 @@ h1 {
 
 #mode-buttons button:hover,
 #game-buttons button:hover {
-  background-color: #333;
-  color: #fff;
+  background-color: #f0f0f0;
+  color: #111;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
 #board {

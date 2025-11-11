@@ -1,3 +1,23 @@
+// Landscape lock for mobile devices
+function checkLandscapeLock() {
+  const lock = document.getElementById('landscape-lock');
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const isLandscape = window.innerWidth > window.innerHeight;
+  if (isMobile && isLandscape) {
+    lock.classList.remove('hidden');
+    // Hide game UI
+    document.querySelector('.container').classList.add('hidden');
+    lock.classList.remove('hidden');
+    lock.style.display = 'flex';
+  } else {
+    lock.classList.add('hidden');
+    document.querySelector('.container').classList.remove('hidden');
+  }
+}
+
+window.addEventListener('resize', checkLandscapeLock);
+window.addEventListener('orientationchange', checkLandscapeLock);
+window.addEventListener('DOMContentLoaded', checkLandscapeLock);
 // Simplified Gomoku game implementation
 let boardSize = 15;
 let board = [];
@@ -211,10 +231,11 @@ sizeUpBtn.addEventListener('mousedown', () => {
   longPressTriggered = false;
   longPressTimer = setTimeout(() => {
     longPressTriggered = true;
-    // Long press: set to max size 25x25
+    // Long press: set to max size 25x25 and maximize
     boardSize = 25;
     resetBoard();
-    messageEl.textContent = 'Board size set to maximum (25x25)';
+    if (!isMaximized) toggleMaximize();
+    messageEl.textContent = 'Board size set to maximum (25x25) and maximized';
     setTimeout(() => {
       if (!gameActive) {
         messageEl.textContent = '';
@@ -239,7 +260,8 @@ sizeUpBtn.addEventListener('touchstart', () => {
     longPressTriggered = true;
     boardSize = 25;
     resetBoard();
-    messageEl.textContent = 'Board size set to maximum (25x25)';
+    if (!isMaximized) toggleMaximize();
+    messageEl.textContent = 'Board size set to maximum (25x25) and maximized';
     setTimeout(() => {
       if (!gameActive) {
         messageEl.textContent = '';
@@ -1095,31 +1117,37 @@ function showHint() {
   if (existingHint) {
     existingHint.remove();
   }
-  
-  // Get best move using advanced AI evaluation (same as AI mode)
-  const bestMove = chooseAIMove();
-  if (!bestMove) return;
-  
-  const [row, col] = bestMove;
-  const cell = boardContainer.children[row * boardSize + col];
-  
-  // Add hint indicator
-  const hint = document.createElement('div');
-  hint.classList.add('hint-indicator');
-  cell.appendChild(hint);
-  
-  // Remove hint after 3 seconds
+
+  // Show thinking message before AI calculation
+  messageEl.textContent = 'AI is thinking...';
+
+  // Use setTimeout to allow UI update before heavy calculation
   setTimeout(() => {
-    hint.remove();
-  }, 3000);
-  
-  messageEl.textContent = 'Hint shown for 3 seconds';
-  setTimeout(() => {
-    if (gameActive) {
-      messageEl.textContent = vsComputer ? 'Your turn' : 
-        (currentPlayer === 'black' ? "Black's turn" : "White's turn");
-    }
-  }, 3000);
+    // Get best move using advanced AI evaluation (same as AI mode)
+    const bestMove = chooseAIMove();
+    if (!bestMove) return;
+
+    const [row, col] = bestMove;
+    const cell = boardContainer.children[row * boardSize + col];
+
+    // Add hint indicator
+    const hint = document.createElement('div');
+    hint.classList.add('hint-indicator');
+    cell.appendChild(hint);
+
+    // Remove hint after 3 seconds
+    setTimeout(() => {
+      hint.remove();
+    }, 3000);
+
+    messageEl.textContent = 'Hint shown for 3 seconds';
+    setTimeout(() => {
+      if (gameActive) {
+        messageEl.textContent = vsComputer ? 'Your turn' : 
+          (currentPlayer === 'black' ? "Black's turn" : "White's turn");
+      }
+    }, 3000);
+  }, 10);
 }
 
 function autoPlaceHint() {
@@ -1170,7 +1198,7 @@ function autoPlaceHint() {
   currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
   
   if (vsComputer && currentPlayer === 'white') {
-    messageEl.textContent = 'AI thinking...';
+    messageEl.textContent = 'AI is thinking...';
     setTimeout(() => {
       const [aiRow, aiCol] = chooseAIMove();
       placeStone(aiRow, aiCol, 'white');
