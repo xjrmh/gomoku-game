@@ -1,17 +1,22 @@
 // Landscape lock for mobile devices
 function checkLandscapeLock() {
   const lock = document.getElementById('landscape-lock');
+  const container = document.querySelector('.container');
   const isMobile = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   const isLandscape = window.innerWidth > window.innerHeight;
   if (isMobile && isLandscape) {
     lock.classList.remove('hidden');
-    // Hide game UI
-    document.querySelector('.container').classList.add('hidden');
-    lock.classList.remove('hidden');
     lock.style.display = 'flex';
+    // Only hide the game content, not the lock message
+    Array.from(container.children).forEach(child => {
+      if (child !== lock) child.style.display = 'none';
+    });
   } else {
     lock.classList.add('hidden');
-    document.querySelector('.container').classList.remove('hidden');
+    lock.style.display = 'none';
+    Array.from(container.children).forEach(child => {
+      if (child !== lock) child.style.display = '';
+    });
   }
 }
 
