@@ -272,6 +272,10 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'f' || event.key === 'F') {
     toggleMaximize();
   }
+  // Press 'h' to show hint
+  if (event.key === 'h' || event.key === 'H') {
+    showHint();
+  }
 });
 
 function toggleMaximize() {
