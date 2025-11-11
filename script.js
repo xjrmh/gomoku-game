@@ -1096,8 +1096,8 @@ function showHint() {
     existingHint.remove();
   }
   
-  // Get best move using AI evaluation
-  const bestMove = findBestMove();
+  // Get best move using advanced AI evaluation (same as AI mode)
+  const bestMove = chooseAIMove();
   if (!bestMove) return;
   
   const [row, col] = bestMove;
@@ -1139,8 +1139,8 @@ function autoPlaceHint() {
   // Don't allow in AI vs AI mode
   if (aiVsAi) return;
   
-  // Get best move using AI evaluation
-  const bestMove = findBestMove();
+  // Get best move using advanced AI evaluation (same as AI mode)
+  const bestMove = chooseAIMove();
   if (!bestMove) return;
   
   const [row, col] = bestMove;
