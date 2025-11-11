@@ -7,20 +7,29 @@ function checkLandscapeLock() {
   const isLandscape = window.innerWidth > window.innerHeight;
   const isTooShort = window.innerHeight < 420; // px threshold for too little vertical space
   if (isMobile && (isLandscape || isTooShort)) {
-    // Hide all children except board
+    lock.classList.remove('hidden');
+    lock.style.display = 'flex';
+    // Hide all other children while showing the rotation prompt
     Array.from(container.children).forEach(child => {
-      if (child !== board) child.style.display = 'none';
+      if (child === lock) return;
+      child.style.display = 'none';
     });
-    board.style.display = '';
+    board.style.display = 'none';
     // Maximize board
     if (!container.classList.contains('maximized')) container.classList.add('maximized');
   } else {
     // Restore all children
     Array.from(container.children).forEach(child => {
-      child.style.display = '';
+      if (child === lock) {
+        lock.classList.add('hidden');
+        lock.style.display = '';
+      } else {
+        child.style.display = '';
+      }
     });
+    board.style.display = '';
     // Remove maximize if not in maximize mode
-    if (container.classList.contains('maximized')) container.classList.remove('maximized');
+    if (!isMaximized && container.classList.contains('maximized')) container.classList.remove('maximized');
   }
 }
 
@@ -37,6 +46,7 @@ let aiVsAi = false; // Track AI vs AI mode
 let aiVsAiPaused = false; // Track if AI vs AI is paused
 let previousMode = false; // Track previous mode (false = PvP, true = vs Computer)
 let moveHistory = []; // Track move history for undo
+let stonesOnBoard = 0; // Track number of placed stones for AI heuristics
 
 const boardContainer = document.getElementById('board');
 const messageEl = document.getElementById('message');
@@ -57,6 +67,7 @@ const fireworksCtx = fireworksCanvas.getContext('2d');
 const victoryMessageEl = document.getElementById('victory-message');
 
 let isMaximized = false;
+let lastMoveStone = null;
 
 // Theme colors: [background, light cell, dark cell]
 const themes = [
@@ -85,6 +96,16 @@ const themeNames = [
 
 let currentThemeIndex = 0;
 
+const candidateOffsets = [];
+for (let dr = -2; dr <= 2; dr++) {
+  for (let dc = -2; dc <= 2; dc++) {
+    if (dr === 0 && dc === 0) continue;
+    candidateOffsets.push([dr, dc]);
+  }
+}
+
+const candidateMoves = new Set();
+
 // Audio context for sound effects
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -107,37 +128,43 @@ function playClickSound() {
 
 pvpBtn.addEventListener('click', () => startGame(false));
 
-// Long press support for AI Mode button to enable AI vs AI
-let longPressTimerAI;
-let longPressTriggeredAI = false;
-pvcBtn.addEventListener('mousedown', () => {
-  longPressTriggeredAI = false;
-  longPressTimerAI = setTimeout(() => {
-    longPressTriggeredAI = true;
-    startGame('ai-vs-ai');
-    messageEl.textContent = 'AI vs AI mode activated';
-    setTimeout(() => {
-      if (aiVsAi && gameActive) {
-        messageEl.textContent = 'AI vs AI';
-      }
-    }, 2000);
-  }, 500);
-});
-pvcBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerAI));
-pvcBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerAI));
-pvcBtn.addEventListener('click', (e) => {
-  if (longPressTriggeredAI) {
-    e.preventDefault();
-    return;
-  }
-  startGame(true);
-});
+function addPointerLongPress(element, { onShortPress, onLongPress, delay = 500 }) {
+  let timerId = null;
+  let longPressTriggered = false;
 
-// Touch support for mobile
-pvcBtn.addEventListener('touchstart', () => {
-  longPressTriggeredAI = false;
-  longPressTimerAI = setTimeout(() => {
-    longPressTriggeredAI = true;
+  const startPress = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    longPressTriggered = false;
+    timerId = window.setTimeout(() => {
+      longPressTriggered = true;
+      onLongPress?.(event);
+    }, delay);
+  };
+
+  const clearPress = () => {
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+
+  element.addEventListener('pointerdown', startPress);
+  element.addEventListener('pointerup', clearPress);
+  element.addEventListener('pointerleave', clearPress);
+  element.addEventListener('pointercancel', clearPress);
+  element.addEventListener('click', (event) => {
+    if (longPressTriggered) {
+      event.preventDefault();
+      longPressTriggered = false;
+      return;
+    }
+    onShortPress?.(event);
+  });
+}
+
+addPointerLongPress(pvcBtn, {
+  onShortPress: () => startGame(true),
+  onLongPress: () => {
     startGame('ai-vs-ai');
     messageEl.textContent = 'AI vs AI mode activated';
     setTimeout(() => {
@@ -145,56 +172,22 @@ pvcBtn.addEventListener('touchstart', () => {
         messageEl.textContent = 'AI vs AI';
       }
     }, 2000);
-  }, 500);
+  },
 });
-pvcBtn.addEventListener('touchend', () => clearTimeout(longPressTimerAI));
-pvcBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerAI));
 
 restartBtn.addEventListener('click', () => resetGame());
 reverseBtn.addEventListener('click', () => reverseMove());
 
-// Long press support for Help Me button
-let longPressTimerHelp;
-let longPressTriggeredHelp = false;
-helpBtn.addEventListener('mousedown', () => {
-  longPressTriggeredHelp = false;
-  longPressTimerHelp = setTimeout(() => {
-    longPressTriggeredHelp = true;
-    // Long press: place stone at AI recommendation
-    autoPlaceHint();
-  }, 500);
+addPointerLongPress(helpBtn, {
+  onShortPress: () => showHint(),
+  onLongPress: () => autoPlaceHint(),
 });
-helpBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerHelp));
-helpBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerHelp));
-helpBtn.addEventListener('click', (e) => {
-  if (longPressTriggeredHelp) {
-    e.preventDefault();
-    return;
-  }
-  showHint();
-});
-
-// Touch support for mobile
-helpBtn.addEventListener('touchstart', () => {
-  longPressTriggeredHelp = false;
-  longPressTimerHelp = setTimeout(() => {
-    longPressTriggeredHelp = true;
-    autoPlaceHint();
-  }, 500);
-});
-helpBtn.addEventListener('touchend', () => clearTimeout(longPressTimerHelp));
-helpBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerHelp));
 
 pauseAiBtn.addEventListener('click', () => toggleAiVsAiPause());
 
-// Long press support for theme button
-let longPressTimerTheme;
-let longPressTriggeredTheme = false;
-themeBtn.addEventListener('mousedown', () => {
-  longPressTriggeredTheme = false;
-  longPressTimerTheme = setTimeout(() => {
-    longPressTriggeredTheme = true;
-    // Long press: reset to default theme (index 0)
+addPointerLongPress(themeBtn, {
+  onShortPress: () => changeTheme(),
+  onLongPress: () => {
     currentThemeIndex = 0;
     applyCurrentTheme();
     messageEl.textContent = 'Theme reset to default (Wood)';
@@ -203,44 +196,12 @@ themeBtn.addEventListener('mousedown', () => {
         messageEl.textContent = '';
       }
     }, 2000);
-  }, 500);
-});
-themeBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerTheme));
-themeBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerTheme));
-themeBtn.addEventListener('click', (e) => {
-  if (longPressTriggeredTheme) {
-    e.preventDefault();
-    return;
-  }
-  changeTheme();
+  },
 });
 
-// Touch support for mobile
-themeBtn.addEventListener('touchstart', () => {
-  longPressTriggeredTheme = false;
-  longPressTimerTheme = setTimeout(() => {
-    longPressTriggeredTheme = true;
-    currentThemeIndex = 0;
-    applyCurrentTheme();
-    messageEl.textContent = 'Theme reset to default (Wood)';
-    setTimeout(() => {
-      if (!gameActive) {
-        messageEl.textContent = '';
-      }
-    }, 2000);
-  }, 500);
-});
-themeBtn.addEventListener('touchend', () => clearTimeout(longPressTimerTheme));
-themeBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerTheme));
-
-// Long press support for size-up button
-let longPressTimer;
-let longPressTriggered = false;
-sizeUpBtn.addEventListener('mousedown', () => {
-  longPressTriggered = false;
-  longPressTimer = setTimeout(() => {
-    longPressTriggered = true;
-    // Long press: set to max size 25x25 and maximize
+addPointerLongPress(sizeUpBtn, {
+  onShortPress: () => changeBoardSize(1),
+  onLongPress: () => {
     boardSize = 25;
     resetBoard();
     if (!isMaximized) toggleMaximize();
@@ -250,53 +211,12 @@ sizeUpBtn.addEventListener('mousedown', () => {
         messageEl.textContent = '';
       }
     }, 2000);
-  }, 500); // 500ms to trigger long press
-});
-sizeUpBtn.addEventListener('mouseup', () => clearTimeout(longPressTimer));
-sizeUpBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimer));
-sizeUpBtn.addEventListener('click', (e) => {
-  if (longPressTriggered) {
-    e.preventDefault();
-    return;
-  }
-  changeBoardSize(1);
+  },
 });
 
-// Touch support for mobile
-sizeUpBtn.addEventListener('touchstart', () => {
-  longPressTriggered = false;
-  longPressTimer = setTimeout(() => {
-    longPressTriggered = true;
-    boardSize = 25;
-    resetBoard();
-    if (!isMaximized) toggleMaximize();
-    messageEl.textContent = 'Board size set to maximum (25x25) and maximized';
-    setTimeout(() => {
-      if (!gameActive) {
-        messageEl.textContent = '';
-      }
-    }, 2000);
-  }, 500);
-});
-sizeUpBtn.addEventListener('touchend', () => clearTimeout(longPressTimer));
-sizeUpBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimer));
-
-sizeDownBtn.addEventListener('click', (e) => {
-  if (longPressTriggeredDown) {
-    e.preventDefault();
-    return;
-  }
-  changeBoardSize(-1);
-});
-
-// Long press support for size-down button
-let longPressTimerDown;
-let longPressTriggeredDown = false;
-sizeDownBtn.addEventListener('mousedown', () => {
-  longPressTriggeredDown = false;
-  longPressTimerDown = setTimeout(() => {
-    longPressTriggeredDown = true;
-    // Long press: set to default size 15x15
+addPointerLongPress(sizeDownBtn, {
+  onShortPress: () => changeBoardSize(-1),
+  onLongPress: () => {
     boardSize = 15;
     resetBoard();
     messageEl.textContent = 'Board size reset to default (15x15)';
@@ -305,28 +225,8 @@ sizeDownBtn.addEventListener('mousedown', () => {
         messageEl.textContent = '';
       }
     }, 2000);
-  }, 500);
+  },
 });
-sizeDownBtn.addEventListener('mouseup', () => clearTimeout(longPressTimerDown));
-sizeDownBtn.addEventListener('mouseleave', () => clearTimeout(longPressTimerDown));
-
-// Touch support for mobile
-sizeDownBtn.addEventListener('touchstart', () => {
-  longPressTriggeredDown = false;
-  longPressTimerDown = setTimeout(() => {
-    longPressTriggeredDown = true;
-    boardSize = 15;
-    resetBoard();
-    messageEl.textContent = 'Board size reset to default (15x15)';
-    setTimeout(() => {
-      if (!gameActive) {
-        messageEl.textContent = '';
-      }
-    }, 2000);
-  }, 500);
-});
-sizeDownBtn.addEventListener('touchend', () => clearTimeout(longPressTimerDown));
-sizeDownBtn.addEventListener('touchcancel', () => clearTimeout(longPressTimerDown));
 
 maximizeBtn.addEventListener('click', () => toggleMaximize());
 
@@ -361,33 +261,8 @@ function toggleMaximize() {
   } else {
     containerEl.classList.remove('maximized');
   }
-  
-  // Force complete board re-render immediately
-  const currentBoard = board.map(row => [...row]); // Save current state
-  boardContainer.innerHTML = ''; // Clear board
-  
-  // Recreate all cells
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      const cell = document.createElement('div');
-      cell.classList.add('cell');
-      if ((r + c) % 2 === 1) cell.classList.add('dark');
-      cell.dataset.row = r;
-      cell.dataset.col = c;
-      cell.addEventListener('click', handleCellClick);
-      boardContainer.appendChild(cell);
-      
-      // Restore stone if it existed
-      if (currentBoard[r][c]) {
-        const stone = document.createElement('div');
-        stone.classList.add('stone', currentBoard[r][c]);
-        cell.appendChild(stone);
-      }
-    }
-  }
-  
-  // Reapply theme
-  applyCurrentTheme();
+
+  rebuildBoard();
 }
 
 // Show initial page with empty board
@@ -417,8 +292,7 @@ function startGame(computerMode) {
   resetBoard();
   gameActive = true;
   currentPlayer = 'black';
-  moveHistory = []; // Clear move history
-  
+
   // Update title and page title based on mode
   if (aiVsAi) {
     messageEl.textContent = 'AI vs AI';
@@ -444,9 +318,24 @@ function startGame(computerMode) {
 
 function resetBoard() {
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
+  moveHistory = [];
+  stonesOnBoard = 0;
+  candidateMoves.clear();
+  lastMoveStone = null;
+  renderBoardStructure();
+}
+
+function rebuildBoard() {
+  renderBoardStructure();
+  refreshLastMoveHighlight();
+}
+
+function renderBoardStructure() {
   boardContainer.innerHTML = '';
   boardContainer.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
   boardContainer.style.gridTemplateRows = `repeat(${boardSize}, 1fr)`;
+  const fragment = document.createDocumentFragment();
+
   for (let r = 0; r < boardSize; r++) {
     for (let c = 0; c < boardSize; c++) {
       const cell = document.createElement('div');
@@ -455,10 +344,18 @@ function resetBoard() {
       cell.dataset.row = r;
       cell.dataset.col = c;
       cell.addEventListener('click', handleCellClick);
-      boardContainer.appendChild(cell);
+
+      if (board[r][c]) {
+        const stone = document.createElement('div');
+        stone.classList.add('stone', board[r][c]);
+        cell.appendChild(stone);
+      }
+
+      fragment.appendChild(cell);
     }
   }
-  // Apply current theme colors
+
+  boardContainer.appendChild(fragment);
   applyCurrentTheme();
 }
 
@@ -469,15 +366,14 @@ function resetGame() {
   reverseBtn.classList.add('hidden');
   helpBtn.classList.add('hidden');
   pauseAiBtn.classList.add('hidden');
-  
+
   // Move maximize button back to mode-buttons (after Size +)
   document.getElementById('mode-buttons').appendChild(maximizeBtn);
-  
+
   messageEl.textContent = '';
   gameActive = false;
   aiVsAi = false; // Reset AI vs AI mode
   aiVsAiPaused = false;
-  moveHistory = []; // Clear move history
   // Clear and render an empty board
   resetBoard();
   
@@ -617,16 +513,20 @@ function placeStone(row, col, player) {
   if (existingHint) {
     existingHint.remove();
   }
-  
+
   board[row][col] = player;
+  stonesOnBoard++;
+  updateCandidatesAfterPlacement(row, col);
   const cell = boardContainer.children[row * boardSize + col];
   const stone = document.createElement('div');
   stone.classList.add('stone', player);
   cell.appendChild(stone);
-  
+
   // Add to move history
   moveHistory.push({ row, col, player });
-  
+
+  refreshLastMoveHighlight();
+
   playClickSound();
 }
 
@@ -707,10 +607,7 @@ function findBestMoveWithMinimax() {
   
   // Evaluate more candidates for better moves
   const topCandidates = candidates.slice(0, Math.min(20, candidates.length));
-  
-  // Show thinking message
-  messageEl.textContent = 'Computer is thinking...';
-  
+
   for (let [r, c] of topCandidates) {
     board[r][c] = 'white';
     const score = minimax(depth - 1, -Infinity, Infinity, false);
@@ -901,32 +798,17 @@ function findBestMove() {
 }
 
 function getCandidateMoves() {
-  const moves = [];
   const scored = [];
-  
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      if (board[r][c] === null && hasNeighbor(r, c, 2)) {
-        const score = evaluatePosition(r, c, 'white') + evaluatePosition(r, c, 'black');
-        scored.push({ move: [r, c], score });
-      }
-    }
+  const candidates = gatherCandidateCoordinates(true);
+
+  for (const [r, c] of candidates) {
+    const score = evaluatePosition(r, c, 'white') + evaluatePosition(r, c, 'black');
+    scored.push({ move: [r, c], score });
   }
-  
-  // Sort by score descending
+
   scored.sort((a, b) => b.score - a.score);
-  
-  if (scored.length > 0) {
-    return scored.map(s => s.move);
-  }
-  
-  // Fallback: return all empty positions
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      if (board[r][c] === null) moves.push([r, c]);
-    }
-  }
-  return moves;
+
+  return scored.map(({ move }) => move);
 }
 
 function evaluatePosition(row, col, player) {
@@ -979,17 +861,15 @@ function isOpen(row, col, dRow, dCol, player) {
 }
 
 function findWinningMove(player) {
-  for (let r = 0; r < boardSize; r++) {
-    for (let c = 0; c < boardSize; c++) {
-      if (board[r][c] === null) {
-        board[r][c] = player;
-        if (checkWin(r, c, player)) {
-          board[r][c] = null;
-          return [r, c];
-        }
-        board[r][c] = null;
-      }
+  const potentialMoves = gatherCandidateCoordinates(true);
+
+  for (const [r, c] of potentialMoves) {
+    board[r][c] = player;
+    if (checkWin(r, c, player)) {
+      board[r][c] = null;
+      return [r, c];
     }
+    board[r][c] = null;
   }
   return null;
 }
@@ -1015,6 +895,98 @@ function isBoardFull() {
     }
   }
   return true;
+}
+
+function gatherCandidateCoordinates(includeFallback = false) {
+  if (stonesOnBoard === 0) {
+    const center = Math.floor(boardSize / 2);
+    return [[center, center]];
+  }
+
+  const result = [];
+  const invalidKeys = [];
+
+  candidateMoves.forEach((key) => {
+    const [row, col] = key.split(':').map(Number);
+    if (board[row]?.[col] !== null) {
+      invalidKeys.push(key);
+      return;
+    }
+    if (hasNeighbor(row, col, 2)) {
+      result.push([row, col]);
+    } else {
+      invalidKeys.push(key);
+    }
+  });
+
+  invalidKeys.forEach((key) => candidateMoves.delete(key));
+
+  if (result.length === 0 && includeFallback) {
+    for (let r = 0; r < boardSize; r++) {
+      for (let c = 0; c < boardSize; c++) {
+        if (board[r][c] === null && hasNeighbor(r, c, 2)) {
+          result.push([r, c]);
+        }
+      }
+    }
+  }
+
+  if (result.length > 0) {
+    return result;
+  }
+
+  return includeFallback ? gatherFallbackMoves() : result;
+}
+
+function gatherFallbackMoves() {
+  const fallback = [];
+  for (let r = 0; r < boardSize; r++) {
+    for (let c = 0; c < boardSize; c++) {
+      if (board[r][c] === null) {
+        fallback.push([r, c]);
+      }
+    }
+  }
+  return fallback;
+}
+
+function updateCandidatesAfterPlacement(row, col) {
+  candidateMoves.delete(`${row}:${col}`);
+  candidateOffsets.forEach(([dr, dc]) => {
+    const nr = row + dr;
+    const nc = col + dc;
+    if (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] === null) {
+      candidateMoves.add(`${nr}:${nc}`);
+    }
+  });
+}
+
+function updateCandidatesAfterRemoval(row, col) {
+  candidateMoves.add(`${row}:${col}`);
+  candidateOffsets.forEach(([dr, dc]) => {
+    const nr = row + dr;
+    const nc = col + dc;
+    if (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] === null) {
+      candidateMoves.add(`${nr}:${nc}`);
+    }
+  });
+}
+
+function refreshLastMoveHighlight() {
+  if (lastMoveStone) {
+    lastMoveStone.classList.remove('last-move');
+    lastMoveStone = null;
+  }
+
+  if (moveHistory.length === 0) return;
+
+  const { row, col } = moveHistory[moveHistory.length - 1];
+  const cell = boardContainer.children[row * boardSize + col];
+  if (!cell) return;
+  const stone = cell.querySelector('.stone');
+  if (!stone) return;
+  stone.classList.add('last-move');
+  lastMoveStone = stone;
 }
 
 function changeTheme() {
@@ -1084,21 +1056,29 @@ function reverseMove() {
   
   for (let i = 0; i < movesToUndo && moveHistory.length > 0; i++) {
     const lastMove = moveHistory.pop();
-    
+
     // Remove stone from board
     board[lastMove.row][lastMove.col] = null;
-    
+    stonesOnBoard = Math.max(0, stonesOnBoard - 1);
+    updateCandidatesAfterRemoval(lastMove.row, lastMove.col);
+
     // Remove stone from UI
     const cell = boardContainer.children[lastMove.row * boardSize + lastMove.col];
     const stone = cell.querySelector('.stone');
     if (stone) {
       cell.removeChild(stone);
     }
-    
+
     // Update current player
     currentPlayer = lastMove.player;
   }
-  
+
+  if (stonesOnBoard === 0) {
+    candidateMoves.clear();
+  }
+
+  refreshLastMoveHighlight();
+
   // Update message
   if (vsComputer) {
     messageEl.textContent = 'Your turn';
